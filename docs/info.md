@@ -35,7 +35,7 @@ To test the project:
 
 - encode a 4-bit message into 8-bit sequence
 - introduce an error by flipping any one bit (or more bits)
-- send the perturbed data to the ASIC in the correct [sequence](###bit-sequence)
+- send the perturbed data to the ASIC in the correct [sequence]()
 - compare the output with the 8-bit input before the error
 - extract the 4-bit message and compare with the original message
 

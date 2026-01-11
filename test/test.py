@@ -96,7 +96,7 @@ async def test_random_msg_2_bit_flip(dut):
     # Introduce a single-bit error at a random position
     noised_parity_bits = parity_bits.copy()
     err1 = randint(0, 7)
-    err2 = randint(0, 7)
+    err2 = random_exclude(0, 7, [err1])
     noised_parity_bits[err1] ^= 1
     noised_parity_bits[err2] ^= 1
     noised_msg = get_dec(noised_parity_bits) 
@@ -141,4 +141,10 @@ async def reset(dut):
     dut.rst_n.value = 0
     await ClockCycles(dut.clk, 10)
     dut.rst_n.value = 1
+
+def random_exclude(range_start, range_end, excludes):
+    r = randint(range_start, range_end)
+    while r in excludes:
+        r = randint(range_start, range_end)
+    return r
 
