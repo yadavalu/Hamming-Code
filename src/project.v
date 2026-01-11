@@ -17,8 +17,8 @@ module tt_um_hamming_code_8_4 (
 );
 
   // Tie off unused pins
-  assign uio_out[7:2] = 7'b0;
-  assign uio_oe[7:2]  = 7'b0;
+  assign uio_out[7:2] = 6'b0;
+  assign uio_oe[7:2]  = 6'b0;
 
   reg [2:0] syndrome;
   integer i;
@@ -28,7 +28,7 @@ module tt_um_hamming_code_8_4 (
     syndrome = 3'b000;
     for (i = 0; i <= 7; i = i + 1) begin
       if (ui_in[i]) begin
-        syndrome = syndrome ^ i;
+        syndrome = syndrome ^ i[2:0];
       end
     end
   end
@@ -71,6 +71,6 @@ module tt_um_hamming_code_8_4 (
   assign uo_out = corrected_data;
 
   // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, 1'b0};
+  wire _unused = &{ena, clk, rst_n, uio_in, 1'b0};
 
 endmodule
