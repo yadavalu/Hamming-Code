@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module tt_um_example (
+module tt_um_hamming_code_8_4 (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
@@ -16,10 +16,59 @@ module tt_um_example (
     input  wire       rst_n     // reset_n - low to reset
 );
 
-  // All output pins must be assigned. If not used, assign to 0.
-  assign uo_out  = ui_in + uio_in;  // Example: ou_out is the sum of ui_in and uio_in
-  assign uio_out = 0;
-  assign uio_oe  = 0;
+  // Tie off unused pins
+  assign uio_out[7:2] = 7'b0;
+  assign uio_oe[7:2]  = 7'b0;
+
+  reg [2:0] syndrome;
+  integer i;
+
+  // Analyse syndrome with XORs
+  always @(*) begin
+    syndrome = 3'b000;
+    for (i = 0; i <= 7; i = i + 1) begin
+      if (ui_in[i]) begin
+        syndrome = syndrome ^ i;
+      end
+    end
+  end
+
+  // Check overall parity to identify 0th bit flip or possible double bit error
+  reg overall_parity;
+  integer j;
+
+  always @(*) begin
+    overall_parity = ui_in[0];
+    for (j = 1; j <= 7; j = j + 1) begin
+        overall_parity = overall_parity ^ ui_in[j];
+    end
+  end
+
+  // Error detection flag
+  wire single_error, double_error;
+  assign single_error = overall_parity == 1'b1;
+  assign double_error = (syndrome != 3'b000) && (overall_parity == 1'b0);
+
+  assign uio_oe[0]  = 1'b1;
+  assign uio_out[0] = single_error | double_error;
+  assign uio_oe[1]  = 1'b1;
+  assign uio_out[1] = double_error;
+  
+
+  // Correct data
+  reg [7:0] corrected_data;
+
+  always @(*) begin
+    corrected_data = ui_in;
+    if (overall_parity == 1'b1) begin
+      if (syndrome == 3'b000)
+        corrected_data[0] = ~ui_in[0];
+      else
+        corrected_data[syndrome] = ~ui_in[syndrome];
+    end
+  end
+
+  assign uo_out = corrected_data;
 
   // List all unused inputs to prevent warnings
   wire _unused = &{ena, clk, rst_n, 1'b0};

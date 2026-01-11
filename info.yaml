@@ -1,9 +1,9 @@
 # Tiny Tapeout project information
 project:
-  title:        ""      # Project title
-  author:       ""      # Your name
-  discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  ""      # One line description of what your project does
+  title:        "Hamming Code"      # Project title
+  author:       "Aadith Yadav Govindarajan"      # Your name
+  discord:      "arccothx"      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
+  description:  "A Hamming Code implementation for pinpointing error and correction"      # One line description of what your project does
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
   clock_hz:     0       # Clock frequency in Hz (or 0 if not applicable)
 
@@ -11,7 +11,7 @@ project:
   tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_example"
+  top_module:  "tt_um_hamming_code_8_4"
 
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.
@@ -23,28 +23,27 @@ project:
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: ""
-  ui[1]: ""
-  ui[2]: ""
-  ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
-  ui[7]: ""
-
+  ui[0]: "parity_in_0"
+  ui[1]: "parity_in_1"
+  ui[2]: "parity_in_2"
+  ui[3]: "data_in_0"
+  ui[4]: "parity_in_3"
+  ui[5]: "data_in_1"
+  ui[6]: "data_in_2"
+  ui[7]: "data_in_3"
   # Outputs
-  uo[0]: ""
-  uo[1]: ""
-  uo[2]: ""
-  uo[3]: ""
-  uo[4]: ""
-  uo[5]: ""
-  uo[6]: ""
-  uo[7]: ""
+  uo[0]: "parity_out_0"
+  uo[1]: "parity_out_1"
+  uo[2]: "parity_out_2"
+  uo[3]: "data_out_0"
+  uo[4]: "parity_out_3"
+  uo[5]: "data_out_1"
+  uo[6]: "data_out_2"
+  uo[7]: "data_out_3"
 
   # Bidirectional pins
-  uio[0]: ""
-  uio[1]: ""
+  uio[0]: "single_error_flag"
+  uio[1]: "double_error_flag"
   uio[2]: ""
   uio[3]: ""
   uio[4]: ""
