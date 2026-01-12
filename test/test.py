@@ -6,7 +6,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
 from random import randint
-from test.utils import calculate_msg
+from utils import calculate_msg
 
 
 @cocotb.test()
