@@ -6,6 +6,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
 from random import randint
+from test.utils import calculate_msg
 
 
 @cocotb.test()
@@ -36,103 +37,100 @@ async def test_project(dut):
     await test_random_msg_0_bit_flip(dut)
 
 
-
-def calculate_parity(msg):
-    parity_001 = msg[0] ^ msg[1] ^ msg[3]
-    parity_010 = msg[0] ^ msg[2] ^ msg[3]
-    parity_100 = msg[1] ^ msg[2] ^ msg[3]
-
-    overall_parity = parity_001 ^ parity_010 ^ parity_100 ^ msg[0] ^ msg[1] ^ msg[2] ^ msg[3]
-    
-    return [overall_parity, parity_001, parity_010] + [msg[0]] + [parity_100] + msg[1:]
-
-def get_msg(num):
-    bit_str = get_8_bit_bin_list(num)
-    return [bit_str[3]] + bit_str[5:]
-
-def get_4_bit_bin_list(value):
-    return [int(bit) for bit in format(value, '04b')]
-
-def get_8_bit_bin_list(value):
-    return [int(bit) for bit in format(value, '08b')]
-
-def get_dec(bin_list):
-    return sum(bit * (1 << idx) for idx, bit in enumerate(reversed(bin_list)))
-
-async def test_random_msg_1_bit_flip(dut, err=randint(0, 7)):
+async def test_random_msg_1_bit_flip(dut, err=randint(0, 12)):
     await reset(dut)
 
-    msg = randint(0, 15)
-    parity_bits = calculate_parity(get_4_bit_bin_list(msg))
+    msg_val = randint(0, 255)
+    data_in_bits = [int(b) for b in format(msg_val, '08b')[::-1]] # LSB first
+    full_code = calculate_msg(data_in_bits)
 
-    expected_msg = get_dec(parity_bits)
+    noised = full_code.copy()
+    noised[err] ^= 1
 
-    dut._log.info(f"Random message: {msg}, bit string: {parity_bits} = {expected_msg}")
+    # Format for Pins
+    # ui_in gets data bits from indices: 3, 5, 6, 7, 9, 10, 11, 12
+    ui_val = sum(noised[idx] << i for i, idx in enumerate([3, 5, 6, 7, 9, 10, 11, 12]))
+    # uio_in[6:2] gets parity bits from indices: 0, 1, 2, 4, 8
+    uio_val = sum(noised[idx] << i for i, idx in enumerate([0, 1, 2, 4, 8])) << 2  # bitshift to ignore flags
+
+    dut._log.info(f"Testing message: {msg_val}, full code: {full_code}, noised: {noised}")
+    dut._log.info(f"Input: {ui_val}, {uio_val}")
+
+    dut.ui_in.value = ui_val
+    dut.uio_in.value = uio_val
+
+    await ClockCycles(dut.clk, 2)
+
+    dut._log.info(f"Output: {dut.uo_out.value}, {dut.uio_out.value}")
+
+    assert dut.uo_out.value == msg_val, f"Expected corrected output to be {msg_val}, but got {dut.uo_out.value}"
+    flag_str = str(dut.uio_out.value)
+    flag = int(flag_str[-2:], 2)
+    assert flag == 1, f"Expected single error flag to be high and double error flag to be low, but got {flag}"
     
-    # Introduce a single-bit error at a random position
-    noised_parity_bits = parity_bits.copy()
-    noised_parity_bits[err] ^= 1
-    noised_msg = get_dec(noised_parity_bits) 
-    dut._log.info(f"Noised bit string: {noised_parity_bits} = {noised_msg}")
-
-
-    dut.ui_in.value = noised_msg
-
-    await ClockCycles(dut.clk, 1)
-
-    assert dut.uo_out.value == expected_msg, f"Expected uo_out to be {expected_msg} for {noised_msg=}, but got {dut.uo_out.value=}"
-    assert dut.uio_out.value == 1, f"Expected single error flag to be high and double error flag to be low"
-
-    dut._log.info(f"Successfully sent {noised_msg=}, received {dut.uo_out.value=}, expected {expected_msg=}. Decoded {get_msg(msg)} from {msg=}")
 
 async def test_random_msg_2_bit_flip(dut):
     await reset(dut)
 
-    msg = randint(0, 15)
-    parity_bits = calculate_parity(get_4_bit_bin_list(msg))
+    msg_val = randint(0, 255)
+    data_in_bits = [int(b) for b in format(msg_val, '08b')[::-1]] # LSB first
+    full_code = calculate_msg(data_in_bits)
 
-    dut._log.info(f"Random message: {msg}, bit string: {parity_bits}")
-    
-    # Introduce a single-bit error at a random position
-    noised_parity_bits = parity_bits.copy()
-    err1 = randint(0, 7)
-    err2 = random_exclude(0, 7, [err1])
-    noised_parity_bits[err1] ^= 1
-    noised_parity_bits[err2] ^= 1
-    noised_msg = get_dec(noised_parity_bits) 
-    dut._log.info(f"Noised bit string: {noised_parity_bits} = {noised_msg}")
+    noised = full_code.copy()
+    err1 = randint(0, 12)
+    err2 = random_exclude(0, 12, [err1])
+    noised[err1] ^= 1
+    noised[err2] ^= 1
 
+    # Format for Pins
+    # ui_in gets data bits from indices: 3, 5, 6, 7, 9, 10, 11, 12
+    ui_val = sum(noised[idx] << i for i, idx in enumerate([3, 5, 6, 7, 9, 10, 11, 12]))
+    # uio_in[6:2] gets parity bits from indices: 0, 1, 2, 4, 8
+    uio_val = sum(noised[idx] << i for i, idx in enumerate([0, 1, 2, 4, 8])) << 2  # bitshift to ignore flags
 
+    dut._log.info(f"Testing message: {msg_val}, full code: {full_code}, noised: {noised}")
+    dut._log.info(f"Input: {ui_val}, {uio_val}")
 
-    dut.ui_in.value = noised_msg
+    dut.ui_in.value = ui_val
+    dut.uio_in.value = uio_val
 
-    await ClockCycles(dut.clk, 1)
+    await ClockCycles(dut.clk, 2)
 
-    assert dut.uo_out.value == noised_msg, f"Expected uo_out to be {noised_msg}, but got {dut.uo_out.value=}"
-    assert dut.uio_out.value == 3, f"Expected single error flag and double error flag to be high"
+    dut._log.info(f"Output: {dut.uo_out.value}, {dut.uio_out.value}")
 
-    dut._log.info(f"Successfully received back noised bit string {dut.uo_out.value=}, expected {noised_msg=}")
+    assert dut.uo_out.value == ui_val, f"Expected uncorrected output to be {ui_val}, but got {dut.uo_out.value}"
+    flag_str = str(dut.uio_out.value)
+    flag = int(flag_str[-2:], 2)
+    assert flag == 3, f"Expected single error flag and double error flag to be high, but got {flag}"
+
 
 async def test_random_msg_0_bit_flip(dut):
     await reset(dut)
 
-    msg = randint(0, 15)
-    parity_bits = calculate_parity(get_4_bit_bin_list(msg))
+    msg_val = randint(0, 255)
+    data_in_bits = [int(b) for b in format(msg_val, '08b')[::-1]] # LSB first
+    full_code = calculate_msg(data_in_bits)
 
-    expected_msg = get_dec(parity_bits)
+    # Format for Pins
+    # ui_in gets data bits from indices: 3, 5, 6, 7, 9, 10, 11, 12
+    ui_val = sum(full_code[idx] << i for i, idx in enumerate([3, 5, 6, 7, 9, 10, 11, 12]))
+    # uio_in[6:2] gets parity bits from indices: 0, 1, 2, 4, 8
+    uio_val = sum(full_code[idx] << i for i, idx in enumerate([0, 1, 2, 4, 8])) << 2  # bitshift to ignore flags
+    dut._log.info(f"Testing message: {msg_val}, full code: {full_code}")
+    dut._log.info(f"Input: {ui_val}, {uio_val}")
 
-    dut._log.info(f"Random message: {msg}, bit string: {parity_bits}")
+    dut.ui_in.value = ui_val
+    dut.uio_in.value = uio_val
+
+    await ClockCycles(dut.clk, 2)
+
+    dut._log.info(f"Output: {dut.uo_out.value}, {dut.uio_out.value}")
+
+    assert dut.uo_out.value == msg_val, f"Expected corrected output to be {msg_val}, but got {dut.uo_out.value}"
+    flag_str = str(dut.uio_out.value)
+    flag = int(flag_str[-2:], 2)
+    assert flag == 0, f"Expected single error flag and double error flag to be low, but got {flag}"
     
-    dut.ui_in.value = expected_msg
-
-    await ClockCycles(dut.clk, 1)
-
-    assert dut.uo_out.value == expected_msg, f"Expected uo_out to be {expected_msg}, but got {dut.uo_out.value=}"
-    assert dut.uio_out.value == 0, f"Expected single error flag and double error flag to be low"
-    
-    dut._log.info(f"Successfully received back input bit string {dut.uo_out.value=}, expected {expected_msg=}. 0-errors detected.")
-
-
 async def reset(dut):
     dut._log.info("Reset")
     dut.ena.value = 1

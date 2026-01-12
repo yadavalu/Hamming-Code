@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-module tt_um_hamming_code_8_4 (
+module tt_um_hamming_code_13_8 (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
@@ -17,60 +17,54 @@ module tt_um_hamming_code_8_4 (
 );
 
   // Tie off unused pins
+  assign uio_oe = 8'b00000011; 
   assign uio_out[7:2] = 6'b0;
-  assign uio_oe[7:2]  = 6'b0;
 
-  reg [2:0] syndrome;
+  reg [12:0] dwp;
+  always @(*) begin
+    // Hamming Mapping for 13 bits
+    dwp[0] = uio_in[2]; // Overall Parity P0
+    dwp[1] = uio_in[3]; // P0001
+    dwp[2] = uio_in[4]; // P0010
+    dwp[4] = uio_in[5]; // P0100
+    dwp[8] = uio_in[6]; // P1000
+
+    dwp[3]     = ui_in[0];
+    dwp[7:5]   = ui_in[3:1];
+    dwp[12:9]  = ui_in[7:4];
+  end
+
+  reg [3:0] syndrome;
+  reg overall_parity;
   integer i;
 
-  // Analyse syndrome with XORs
   always @(*) begin
-    syndrome = 3'b000;
-    for (i = 0; i <= 7; i = i + 1) begin
-      if (ui_in[i]) begin
-        syndrome = syndrome ^ i[2:0];
-      end
+    syndrome = 4'b0;
+    overall_parity = dwp[0];
+    for (i = 1; i <= 12; i = i + 1) begin
+      if (dwp[i]) syndrome = syndrome ^ i[3:0];
+      overall_parity = overall_parity ^ dwp[i];
     end
   end
 
-  // Check overall parity to identify 0th bit flip or possible double bit error
-  reg overall_parity;
-  integer j;
-
+  reg [12:0] corrected;
   always @(*) begin
-    overall_parity = ui_in[0];
-    for (j = 1; j <= 7; j = j + 1) begin
-        overall_parity = overall_parity ^ ui_in[j];
+    corrected = dwp;
+    if (overall_parity) begin // SECDED Logic: Odd parity means 1 flip
+      if (syndrome == 0) corrected[0] = ~dwp[0];
+      else if (syndrome <= 12) corrected[syndrome] = ~dwp[syndrome];
     end
   end
 
-  // Error detection flag
-  wire single_error, double_error;
-  assign single_error = overall_parity == 1'b1;
-  assign double_error = (syndrome != 3'b000) && (overall_parity == 1'b0);
+  assign uio_out[1] = (syndrome != 0 && !overall_parity);
+  assign uio_out[0] = overall_parity | uio_out[1]; 
 
-  assign uio_oe[0]  = 1'b1;
-  assign uio_out[0] = single_error | double_error;
-  assign uio_oe[1]  = 1'b1;
-  assign uio_out[1] = double_error;
-  
-
-  // Correct data
-  reg [7:0] corrected_data;
-
-  always @(*) begin
-    corrected_data = ui_in;
-    if (overall_parity == 1'b1) begin
-      if (syndrome == 3'b000)
-        corrected_data[0] = ~ui_in[0];
-      else
-        corrected_data[syndrome] = ~ui_in[syndrome];
-    end
-  end
-
-  assign uo_out = corrected_data;
+  // Map back to outputs
+  assign uo_out[0]   = corrected[3];
+  assign uo_out[3:1] = corrected[7:5];
+  assign uo_out[7:4] = corrected[12:9];
 
   // List all unused inputs to prevent warnings
-  wire _unused = &{ena, clk, rst_n, uio_in, 1'b0};
+  wire _unused = &{ena, clk, rst_n, 1'b0};
 
 endmodule
